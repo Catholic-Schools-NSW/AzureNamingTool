@@ -1,0 +1,62 @@
+name: Microsoft Teams Notification on Deployment Status
+
+on: [deployment_status]
+
+jobs:
+  notify-teams:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.deployment.environment }}
+    if: |
+      github.event.deployment_status.state == 'success' ||
+      github.event.deployment_status.state == 'failure'
+    steps:
+    - name: Send Microsoft Teams notification
+      env:
+        TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        #REPO_NAME: ${{ github.repository }}
+      run: |
+        DEPLOYMENT_STATE="${{ github.event.deployment_status.state }}"
+        DEPLOYMENT_ENV="${{ github.event.deployment.environment }}"
+        DEPLOYMENT_URL="${{ github.event.deployment_status.target_url }}"
+        DEPLOYMENT_DESC="${{ github.event.deployment_status.description }}"
+        REPO_NAME=${{ github.repository }} #"${{ env.REPO_NAME }}"
+
+        if [ "$DEPLOYMENT_STATE" == "success" ]; then
+          COLOR="00FF00"
+          STATUS_TEXT="Deployment was successful!"
+        elif [ "$DEPLOYMENT_STATE" == "failure" ]; then
+          COLOR="FF0000"
+          STATUS_TEXT="Deployment failed!"
+        fi
+
+        payload=$(cat <<EOF
+        {
+          "@type": "MessageCard",
+          "@context": "http://schema.org/extensions",
+          "summary": "Deployment Status",
+          "themeColor": "$COLOR",
+          "title": "Deployment Status: $DEPLOYMENT_STATE",
+          "sections": [{
+            "activityTitle": "Deployment to $DEPLOYMENT_ENV",
+            "activitySubtitle": "$STATUS_TEXT",
+            "activityImage": "https://avatars.githubusercontent.com/u/9919?s=200&v=4",
+            "facts": [{
+              "name": "Repository:",
+              "value": "$REPO_NAME"
+            }, {
+              "name": "Environment:",
+              "value": "$DEPLOYMENT_ENV"
+            }, {
+              "name": "Status:",
+              "value": "$DEPLOYMENT_STATE"
+            }, {
+              "name": "Build URL:",
+              "value": "[Link]($DEPLOYMENT_URL)"
+            }],
+            "markdown": true
+          }]
+        }
+        EOF
+        )
+
+        echo "$payload" | curl -H 'Content-Type: application/json' -d @- $TEAMS_WEBHOOK_URL
