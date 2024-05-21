@@ -38,7 +38,6 @@ permissions:
 jobs:
   check-secrets:
       runs-on: ubuntu-latest
-      environment: production
       defaults:
         run:
           working-directory: src    
@@ -96,7 +95,7 @@ jobs:
     needs: [build,check-secrets]
     if: needs.check-secrets.outputs.secrets-valid == 'true'
     environment:
-      name: 'Development'
+      name: 'production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
